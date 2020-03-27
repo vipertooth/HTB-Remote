@@ -402,3 +402,26 @@ meterpreter >
 ```
 
 This is a tool for finding privesc paths on the system. It also highlights higher priority targets. 
+
+![alt text}(https://github.com/vipertooth/HTB-Remote/blob/master/resources/winPEAS.png)
+
+As you can see the port 5939 is only listening on localhost. port to enumerate.  With a quick google you can see that 5939 is used for teamviewer
+
+With some more enumeration we verify this.
+
+```bash
+PS C:\windows\system32\inetsrv>netstat -ano
+
+Active Connections  
+
+  Proto  Local Address          Foreign Address        State           PID
+
+  TCP    127.0.0.1:5939         0.0.0.0:0              LISTENING       2952
+
+PS C:\windows\system32\inetsrv> tasklist
+
+Image Name                     PID Session Name        Session#    Mem Usage      
+========================= ======== ================ =========== ============    
+TeamViewer_Service.exe        2952                            0     18,704 K
+```
+
