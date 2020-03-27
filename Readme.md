@@ -364,3 +364,5 @@ xmlns:csharp_user="http://csharp.mycompany.com/mynamespace">\
  ```
 Before we run the exploit I opened a webserver on 9000 and a nc listener on 9003.
 
+![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/lowpriv-shell.png)
+
