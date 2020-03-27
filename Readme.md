@@ -81,3 +81,80 @@ Nmap done: 1 IP address (1 host up) scanned in 134.24 seconds
 From this I noted open ports to check out being 111, 80, 139, 445.
 
 I like to leave webservers to be the last port to check out because they tend to take the most effort.  It is smart to start gobuster running while enumerating other services
+
+To enumerate port 111 I ran rpcinfo  
+
+
+```bash 
+root@HTBKali:~/HTB/Remote# rpcinfo -p 10.10.10.180
+   program vers proto   port  service
+    100000    2   udp    111  portmapper
+    100000    3   udp    111  portmapper
+    100000    4   udp    111  portmapper
+    100000    2   tcp    111  portmapper
+    100000    3   tcp    111  portmapper
+    100000    4   tcp    111  portmapper
+    100003    2   tcp   2049  nfs
+    100003    3   tcp   2049  nfs
+    100003    2   udp   2049  nfs
+    100003    3   udp   2049  nfs
+    100003    4   tcp   2049  nfs
+    100005    1   tcp   2049  mountd
+    100005    2   tcp   2049  mountd
+    100005    3   tcp   2049  mountd
+    100005    1   udp   2049  mountd
+    100005    2   udp   2049  mountd
+    100005    3   udp   2049  mountd
+    100021    1   tcp   2049  nlockmgr
+    100021    2   tcp   2049  nlockmgr
+    100021    3   tcp   2049  nlockmgr
+    100021    4   tcp   2049  nlockmgr
+    100021    1   udp   2049  nlockmgr
+    100021    2   udp   2049  nlockmgr
+    100021    3   udp   2049  nlockmgr
+    100021    4   udp   2049  nlockmgr
+    100024    1   tcp   2049  status
+    100024    1   udp   2049  status
+    
+```
+This ended up being exactly what the Nmap scan showed, from this you can see that a nfs/mountd service is running.
+
+To list any remote fileservers running I used showmount.
+
+```bash
+root@HTBKali:~/HTB/Remote# showmount -e 10.10.10.180
+Export list for 10.10.10.180:
+/site_backups (everyone)
+```
+
+Now that I know the directory /site_backups is mountable by everyone lets mount it and see what is inside.
+
+```bash
+root@HTBKali:~/HTB/Remote# mkdir nfs
+root@HTBKali:~/HTB/Remote# mount -t nfs 10.10.10.180:/site_backups nfs/ -o nolock
+root@HTBKali:~/HTB/Remote# cd nfs
+root@HTBKali:~/HTB/Remote/nfs# ls
+App_Browsers  App_Data  App_Plugins  aspnet_client  bin  Config  css  default.aspx  Global.asax  Media  scripts  Umbraco  Umbraco_Client  Views  Web.config
+```
+
+Looks like we found the backups from the webserver.  After some enumeration we find the CMS version 7.12.4.
+
+```bash
+root@HTBKali:~/HTB/Remote/nfs# grep ConfigurationStatus Web.config 
+<add key="umbracoConfigurationStatus" value="7.12.4" />
+```    
+
+With this I check if there was any known exploits for this CMS.
+
+```bash
+root@HTBKali:~/HTB/Remote/nfs# searchsploit umbraco
+----------------------------------------------------------------------- ----------------------------------------
+ Exploit Title                                                         |  Path
+                                                                       | (/usr/share/exploitdb/)
+----------------------------------------------------------------------- ----------------------------------------
+Umbraco CMS - Remote Command Execution (Metasploit)                    | exploits/windows/webapps/19671.rb
+Umbraco CMS 7.12.4 - (Authenticated) Remote Code Execution             | exploits/aspx/webapps/46153.py
+Umbraco CMS SeoChecker Plugin 1.9.2 - Cross-Site Scripting             | exploits/php/webapps/44988.txt
+----------------------------------------------------------------------- ----------------------------------------
+Shellcodes: No Result
+```
