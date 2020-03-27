@@ -320,7 +320,7 @@ password="baconandcheese";
 host = "http://10.10.10.180";
 ```
 
-Next I see the code is just poping calc. I changed this to ping.exe to test the execution of the script. I also added arguments for ping.exe where the script says `string cmd = ""`
+Next I see the code is just poping calc. I changed this to `calc.exe` to `ping.exe` to test the execution of the script. I also added arguments for ping.exe where the script says `string cmd = ""`
 
 ![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/poc-ping.png)
 
