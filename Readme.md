@@ -78,12 +78,35 @@ OS and Service detection performed. Please report any incorrect results at https
 Nmap done: 1 IP address (1 host up) scanned in 134.24 seconds
 ```
 
-From this I noted open ports to check out being 111, 80, 139, 445.
+From this I noted open ports to check out being  21, 111, 80, 139, 445.
 
 I like to leave webservers to be the last port to check out because they tend to take the most effort.  It is smart to start gobuster running while enumerating other services
 
-To enumerate port 111 I ran rpcinfo  
+I started with checking the Anonymous login to ftp.
 
+```bash
+root@HTBKali:~/HTB/Remote# ftp 10.10.10.180
+Connected to 10.10.10.180.
+220 Microsoft FTP Service
+Name (10.10.10.180:root): anonymous
+331 Anonymous access allowed, send identity (e-mail name) as password.
+Password:
+230 User logged in.
+Remote system type is Windows_NT.
+ftp> dir
+200 PORT command successful.
+150 Opening ASCII mode data connection.
+226 Transfer complete.
+ftp> cd ..
+250 CWD command successful.
+ftp> dir
+200 PORT command successful.
+125 Data connection already open; Transfer starting.
+226 Transfer complete.
+ftp> 
+```
+
+There was nothing inside the ftp server. Next port 111, to enumerate the port I ran rpcinfo.  
 
 ```bash 
 root@HTBKali:~/HTB/Remote# rpcinfo -p 10.10.10.180
@@ -115,8 +138,9 @@ root@HTBKali:~/HTB/Remote# rpcinfo -p 10.10.10.180
     100021    4   udp   2049  nlockmgr
     100024    1   tcp   2049  status
     100024    1   udp   2049  status
-    
+   
 ```
+
 This ended up being exactly what the Nmap scan showed, from this you can see that a nfs/mountd service is running.
 
 To list any remote fileservers running I used showmount.
@@ -137,10 +161,8 @@ root@HTBKali:~/HTB/Remote/nfs# ls
 App_Browsers  App_Data  App_Plugins  aspnet_client  bin  Config  css  default.aspx  Global.asax  Media  scripts  Umbraco  Umbraco_Client  Views  Web.config
 ```
 
-Looks like we found the backups from the webserver.  After some enumeration we find the CMS version 
-<div class="text-red mb-2">
-   7.12.4 
-</div>.
+Looks like we found the backups from the webserver.  After some enumeration we find the CMS version 7.12.4. 
+
 
 ```bash
 root@HTBKali:~/HTB/Remote/nfs# grep ConfigurationStatus Web.config 
@@ -160,4 +182,33 @@ Umbraco CMS 7.12.4 - (Authenticated) Remote Code Execution             | exploit
 Umbraco CMS SeoChecker Plugin 1.9.2 - Cross-Site Scripting             | exploits/php/webapps/44988.txt
 ----------------------------------------------------------------------- ----------------------------------------
 Shellcodes: No Result
+```
+
+We see that Umbraco CMS 7.12.4 is vulnerable to an Authenticated RCE.  We just need to find those Creds.  After some more enumeration you find the SQL databese file `Umbraco.sdf` in `/App_Data`.  We can look at the contents of the file with strings.
+
+```bash
+root@HTBKali:~/HTB/Remote/nfs/App_Data# strings Umbraco.sdf | head
+Administratoradmindefaulten-US
+Administratoradmindefaulten-USb22924d5-57de-468e-9df4-0961cf6aa30d
+Administratoradminb8be16afba8c314ad33d812f22a04991b90e2aaa{"hashAlgorithm":"SHA1"}en-USf8512f97-cab1-4a4b-a49f-0a2054c47a1d
+adminadmin@htb.localb8be16afba8c314ad33d812f22a04991b90e2aaa{"hashAlgorithm":"SHA1"}admin@htb.localen-USfeb1a998-d3bf-406a-b30b-e269d7abdf50
+adminadmin@htb.localb8be16afba8c314ad33d812f22a04991b90e2aaa{"hashAlgorithm":"SHA1"}admin@htb.localen-US82756c26-4321-4d27-b429-1b5c7c4f882f
+smithsmith@htb.localjxDUCcruzN8rSRlqnfmvqw==AIKYyl6Fyy29KA3htB/ERiyJUAdpTtFeTpnIk9CiHts={"hashAlgorithm":"HMACSHA256"}smith@htb.localen-US7e39df83-5e64-4b93-9702-ae257a9b9749-a054-27463ae58b8e
+ssmithsmith@htb.localjxDUCcruzN8rSRlqnfmvqw==AIKYyl6Fyy29KA3htB/ERiyJUAdpTtFeTpnIk9CiHts={"hashAlgorithm":"HMACSHA256"}smith@htb.localen-US7e39df83-5e64-4b93-9702-ae257a9b9749
+ssmithssmith@htb.local8+xXICbPe7m5NQ22HfcGlg==RF9OLinww9rd2PmaKUpLteR6vesD2MtFaBKe1zL5SXA={"hashAlgorithm":"HMACSHA256"}ssmith@htb.localen-US3628acfb-a62c-4ab0-93f7-5ee9724c8d32
+```
+
+From this we can figure out the database looks something like 
+
+| User | Login Username |  Password(hashed) | Hashing algorithm|
+|-----|----|----|-----|
+| admin | admin@htb.local | b8be16afba8c314ad33d812f22a04991b90e2aaa | {"hashAlgorithm":"SHA1"} |
+| smith | smith@htb.local | jxDUCcruzN8rSRlqnfmvqw==AIKYyl6Fyy29KA3htB/ERiyJUAdpTtFeTpnIk9CiHts= | {"hashAlgorithm":"HMACSHA256"} |
+| ssmith | ssmith@htb.local | jxDUCcruzN8rSRlqnfmvqw==AIKYyl6Fyy29KA3htB/ERiyJUAdpTtFeTpnIk9CiHts= | {"hashAlgorithm":"HMACSHA256"} |
+| ssmith| ssmith@htb.local | 8+xXICbPe7m5NQ22HfcGlg==RF9OLinww9rd2PmaKUpLteR6vesD2MtFaBKe1zL5SXA= | {"hashAlgorithm":"HMACSHA256"} |
+
+With this the admin password being SHA1 instead of HMACSHA256 is telling me to try to crack it.  I will need to get the hashcat example code for SHA1 before I start.  
+```bash
+root@HTBKali:~/HTB/Remote# hashcat -h | grep SHA1
+    100 | SHA1                                             | Raw Hash
 ```
