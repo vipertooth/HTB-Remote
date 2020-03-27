@@ -137,7 +137,10 @@ root@HTBKali:~/HTB/Remote/nfs# ls
 App_Browsers  App_Data  App_Plugins  aspnet_client  bin  Config  css  default.aspx  Global.asax  Media  scripts  Umbraco  Umbraco_Client  Views  Web.config
 ```
 
-Looks like we found the backups from the webserver.  After some enumeration we find the CMS version <div class="text-red mb-2"> 7.12.4 </div>.
+Looks like we found the backups from the webserver.  After some enumeration we find the CMS version 
+<div class="text-red mb-2">
+   7.12.4 
+</div>.
 
 ```bash
 root@HTBKali:~/HTB/Remote/nfs# grep ConfigurationStatus Web.config 
