@@ -426,7 +426,7 @@ meterpreter >
 
 This is a tool for finding privesc paths on the system. It also highlights higher priority targets. 
 
-![alt text}(https://github.com/vipertooth/HTB-Remote/blob/master/resources/winPEAS.png)
+![alt text](https://github.com/vipertooth/HTB-Remote/blob/master/resources/winPEAS.png)
 
 I can see the port 5939 is only listening on localhost. With a quick google you can see that 5939 is used for teamviewer
 
